@@ -149,7 +149,7 @@ function suggest(c,s){const i=SECS.indexOf(s.sec),cur=info(c,s);let L=[];
  for(const sec of L){const r=i<0?0:3;for(let n=8;n<=dims(sec).c;n++){const t={sec,r,n};if(free(c.id,t)&&info(c,t).dist<=cur.dist+1)return t}}
  return{sec:L[0]||'106',r:3,n:8}}
 /* ---------- state ---------- */
-const S={ci:0,sel:{sec:'104',r:7,n:12},alt:null,pick:null,qty:1,pr:'all',act:'104',zoom:1,g:'All concerts',q:'',vn:'All venues',wn:'all',pf:'all',so:'date',pg:1,prev:false,sync:true,light:true,next:null};
+const S={ci:0,sel:{sec:'104',r:7,n:12},alt:null,pick:null,qty:1,pr:'all',act:'104',zoom:1,g:'All concerts',q:'',vn:'All venues',wn:'all',pf:'all',so:'date',pg:1,prev:false,sync:true,light:true,next:null,sp:false};
 const C=()=>CON[S.ci],B=()=>S.alt&&!same(S.alt,S.sel)?S.alt:suggest(C(),S.sel);
 const user=()=>J('sv_user',null),bms=()=>J('sv_bm',[]),saved=()=>J('sv_saved',[]);
 const DEMO={name:'Demo User',email:'demo@gmail.com',pw:'12345'},NOLAN={name:'Nolan',email:'nolan2003@gmail.com',pw:'ilovebts'};
@@ -157,7 +157,16 @@ const DEMO={name:'Demo User',email:'demo@gmail.com',pw:'12345'},NOLAN={name:'Nol
 const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),2400)};
 const md=$('#md');const modal=(t,h)=>{if(md.open)md.close();md.innerHTML=`<button class="x" data-act="close" aria-label="Close">×</button><h2>${t}</h2>${h}`;md.showModal()};
 md.addEventListener('click',e=>{if(e.target==md)md.close()});
-const go=r=>{location.hash='#/'+r};
+const slug=c=>(c.n+' '+c.t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+const SQ=(s,p='')=>`${p}section=${s.sec}&${p}row=${RW[s.r]}&${p}seat=${s.n}`;
+const URLR=['choose','view','compare'];
+const urlFor=r=>{if(!URLR.includes(r))return '#/'+r;const q=['concert='+slug(CON[S.ci])];if(r!='choose'||S.sp)q.push(SQ(S.sel));if(r=='compare'&&S.alt&&!same(S.alt,S.sel))q.push(SQ(S.alt,'alt_'));return '#/'+r+'?'+q.join('&')};
+function applyQ(){const q=new URLSearchParams((location.hash.split('?')[1])||''),cs=q.get('concert');
+ if(cs){const c=CON.find(x=>slug(x)==cs);if(c&&c.id!=S.ci){S.ci=c.id;S.sel={sec:'104',r:7,n:12};S.alt=null;S.act='104';S.pick=null;S.zoom=1;S.sp=false}}
+ const rd=p=>{const sec=q.get(p+'section'),rw=(q.get(p+'row')||'').toUpperCase(),n=+q.get(p+'seat');if(!sec||!(SECS.includes(sec)||FL.includes(sec))||!rw)return null;const r=RW.indexOf(rw),d=dims(sec);return r>=0&&r<d.r&&n>=1&&n<=d.c?{sec,r,n}:null};
+ const a=rd('');if(a){S.sel=a;S.act=a.sec;S.sp=true}const b=rd('alt_');if(b)S.alt=b}
+function syncUrl(){const r=route.last;if(URLR.includes(r)){const u=urlFor(r);if(location.hash!=u)history.replaceState(null,'',u)}}
+const go=r=>{location.hash=urlFor(r)};
 const money=n=>'£'+n;
 const logoI=`<span class="lg-i">${ic('seat')}</span>`;
 const logo=h=>`<a class="logo" href="#/${h?'home':'home'}" aria-label="SeatViewer home">${logoI}SeatViewer</a>`;
@@ -635,13 +644,13 @@ const A={
  terms:()=>modal('Terms &amp; privacy','<p>SeatViewer is a demo. Accounts and saved views are stored only in your browser on this device, and passwords are not sent anywhere.</p><p>Selecting a seat never reserves it, and no payment is taken in this demo.</p>'),
  acct:()=>{const u=user();modal('Your account',`<p>${u.name}<br>${u.email}</p><div style="display:flex;gap:10px"><a class="btn" href="#/saved" data-act="close">Saved views</a><button class="btn pr" data-act="logout">Log out</button></div>`)},
  logout:()=>{st.del('sv_user');md.close();toast('Logged out.');route()},
- open:el=>{S.ci=+el.dataset.i;S.sel={sec:'104',r:7,n:12};S.alt=null;S.act='104';S.pick=null;S.zoom=1;go('choose')},
+ open:el=>{S.ci=+el.dataset.i;S.sp=false;S.sel={sec:'104',r:7,n:12};S.alt=null;S.act='104';S.pick=null;S.zoom=1;go('choose')},
  bm:el=>{const i=+el.dataset.i,b=bms(),on=b.includes(i);st.set('sv_bm',JSON.stringify(on?b.filter(x=>x!=i):[...b,i]));el.classList.toggle('on',!on);toast(on?'Removed from your saved concerts.':'Concert saved.')},
  dg:el=>{S.g=el.dataset.g;route()},bg:el=>{S.g=el.dataset.g;S.pg=1;route()},
  bprev:()=>{S.prev=!S.prev;S.pg=1;route()},breset:()=>{Object.assign(S,{g:'All concerts',q:'',vn:'All venues',wn:'all',pf:'all',so:'date',pg:1,prev:false});route()},
  pp:el=>{S.pg=+el.dataset.p;route();scrollTo({top:0})},
- sample:()=>{S.ci=0;S.sel={sec:'104',r:7,n:12};S.alt=null;go('view')},
- seat:el=>{const[s,r,n]=el.dataset.s.split('|');S.sel={sec:s,r:+r,n:+n};S.act=s;refresh()},
+ sample:()=>{S.ci=0;S.sp=true;S.sel={sec:'104',r:7,n:12};S.alt=null;go('view')},
+ seat:el=>{const[s,r,n]=el.dataset.s.split('|');S.sel={sec:s,r:+r,n:+n};S.sp=true;S.act=s;refresh()},
  mz:el=>{S.zoom=Math.max(1,Math.min(2,S.zoom+el.dataset.d*.25));paintMap()},
  prev3d:()=>go('view'),addcmp:()=>{S.alt=null;go('compare')},cmpB:()=>go('compare'),
  usepick:()=>{if(S.pick=='B'){S.alt={...S.sel};S.sel=S.keepA}else if(same(S.alt,S.sel))S.alt=null;S.pick=null;go('compare')},
@@ -653,7 +662,7 @@ const A={
  fs:el=>{const v=el.closest('.vw');(v.requestFullscreen||v.webkitRequestFullscreen||(()=>toast('Fullscreen is not supported here.'))).call(v)},
  saveView:()=>addSaved({ci:S.ci,a:{...S.sel}},'View saved to Saved views.'),
  saveCmp:()=>addSaved({ci:S.ci,a:{...S.sel},b:{...B()}},'Comparison saved.'),
- openSaved:el=>{const v=saved().find(x=>x.id==el.dataset.id);if(!v)return;S.ci=v.ci;S.sel=v.a;S.alt=v.b||null;S.pick=null;go(v.b?'compare':'view')},
+ openSaved:el=>{const v=saved().find(x=>x.id==el.dataset.id);if(!v)return;S.sp=true;S.ci=v.ci;S.sel=v.a;S.alt=v.b||null;S.pick=null;go(v.b?'compare':'view')},
  delSaved:el=>{st.set('sv_saved',JSON.stringify(saved().filter(x=>x.id!=el.dataset.id)));toast('Removed.');route()},
  choose:el=>{const k=el.dataset.k,s=k=='A'?S.sel:B(),c=C(),i=info(c,s),u=user();
   modal('Reserve your seat',`<div class="od"><span class="mu">Show</span><b>${c.n} · ${c.t}</b></div><div class="od"><span class="mu">When</span><span>${fd(c)} · ${c.tm}</span></div><div class="od"><span class="mu">Seat</span><span>${i.name} · Row ${i.row} · Seat ${s.n}${S.qty>1?` (+${S.qty-1} nearby)`:''}</span></div><div class="od"><span class="mu">Total (${S.qty} × ${money(i.price)}, incl. fees)</span><b>${money(i.price*S.qty)}</b></div><form id="ckf" novalidate style="margin-top:16px"><label class="fl">Name</label><input class="inp" id="cn" value="${u?u.name:''}" style="margin-bottom:12px"><label class="fl">Email</label><input class="inp" id="ce" type="email" value="${u?u.email:''}" style="margin-bottom:6px"><div class="er" id="ck-er"></div><button class="btn pr lg w" style="margin-top:12px">Confirm reservation</button><p class="xs mu" style="margin-top:10px;text-align:center">Demo only. No payment is taken.</p></form>`);
@@ -666,11 +675,11 @@ const A={
 };
 function addSaved(o,msg){const l=saved();o.id=Date.now();o.t=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short'});st.set('sv_saved',JSON.stringify([o,...l]));toast(msg)}
 function signIn(u,rem){st.del('sv_user');st.set('sv_user',JSON.stringify({name:u.name,email:u.email}),!rem);const n=S.next||'discover';S.next=null;go(n);toast('Welcome, '+u.name.split(' ')[0]+'!')}
-function refresh(){$('#cl').innerHTML=closer();$('#sp').innerHTML=seatPanel();paintMap()}
+function refresh(){$('#cl').innerHTML=closer();$('#sp').innerHTML=seatPanel();paintMap();syncUrl()}
 /* ---------- events / router ---------- */
 document.addEventListener('click',e=>{const a=e.target.closest('[data-act]');if(a){const f=A[a.dataset.act];if(f){if(a.tagName=='A'&&!a.getAttribute('href'))e.preventDefault();f(a)}return}const g=e.target.closest('[data-go]');if(g)go(g.dataset.go);
  const sec=e.target.closest('g[data-sec]');if(sec&&!e.target.matches('.sd:not(.un)')&&$('#msvg')){S.act=sec.dataset.sec;$('#cl').innerHTML=closer();paintMap()}
- const d=e.target.closest('.sd:not(.un)');if(d&&d.dataset.s){const[s,r,n]=d.dataset.s.split('|');S.sel={sec:s,r:+r,n:+n};S.act=s;refresh()}});
+ const d=e.target.closest('.sd:not(.un)');if(d&&d.dataset.s){const[s,r,n]=d.dataset.s.split('|');S.sel={sec:s,r:+r,n:+n};S.sp=true;S.act=s;refresh()}});
 document.addEventListener('keydown',e=>{if((e.key=='Enter'||e.key==' ')&&e.target.matches('.cc')){e.preventDefault();A.open(e.target)}});
 document.addEventListener('submit',e=>e.preventDefault());
 function wire(r){const $v=id=>$('#'+id);
@@ -684,10 +693,10 @@ function wire(r){const $v=id=>$('#'+id);
   if(!n)m='Please enter your name.';else if(!/^\S+@\S+\.\S+$/.test(em))m='Please enter a valid email address.';else if(pw.length<8)m='Your password needs at least 8 characters.';else if(!$v('sa').checked)m='Please agree to the Terms and Privacy policy.';else if(em==DEMO.email||em==NOLAN.email||us.some(x=>x.email==em))m='An account with this email already exists. Try logging in.';
   er.textContent=m;er.classList.toggle('on',!!m);if(m)return;us.push({name:n,email:em,pw});st.set('sv_users',JSON.stringify(us));signIn({name:n,email:em},true)};$v('sn').focus()}}
 document.addEventListener('submit',e=>{if(e.target.id=='ff'){e.preventDefault();const v=$('#fe').value;if(!/^\S+@\S+\.\S+$/.test(v)){toast('Please enter a valid email.');return}md.close();toast('Reset link sent (demo).')}});
-function route(){vDispose();let r=(location.hash||'#/home').replace(/^#\/?/,'').split('?')[0],scroll=null;if(r=='how'){r='discover';scroll='how'}if(!P[r])r='home';
+function route(){vDispose();let r=(location.hash||'#/home').replace(/^#\/?/,'').split('?')[0],scroll=null;if(r=='how'){r='discover';scroll='how'}if(!P[r])r='home';if(URLR.includes(r))applyQ();
  if(r!='choose'&&S.pick){S.pick=null;if(S.keepA)S.sel=S.keepA}
  if(r=='compare'&&same(S.alt,S.sel))S.alt=null;
  $('#app').innerHTML=P[r]();document.title=({home:'SeatViewer',discover:'Discover concerts',browse:'Browse concerts',choose:'Choose your seat',view:'Your stage perspective',compare:'Compare seat views',saved:'Saved views',login:'Log in',signup:'Sign up'})[r]+' · SeatViewer';
- wire(r);if(md.open)md.close();if(scroll)setTimeout(()=>$('#'+scroll).scrollIntoView({behavior:'smooth'}),30);else if(route.last!=r||r!='browse')scrollTo({top:0,behavior:'instant'});route.last=r}
+ wire(r);if(md.open)md.close();if(scroll)setTimeout(()=>$('#'+scroll).scrollIntoView({behavior:'smooth'}),30);else if(route.last!=r||r!='browse')scrollTo({top:0,behavior:'instant'});route.last=r;syncUrl()}
 addEventListener('hashchange',route);route();
 </script></body></html>
